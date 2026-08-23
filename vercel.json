@@ -5,11 +5,11 @@
       "headers": [
         {
           "key": "Permissions-Policy",
-          "value": "display-capture=(self), microphone=(self), camera=(self)"
+          "value": "display-capture=*, microphone=*, camera=*"
         },
         {
-          "key": "X-Frame-Options",
-          "value": "ALLOW-FROM https://discord.com"
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors 'self' https://discord.com https://*.discord.app https://*.discordsays.com;"
         }
       ]
     }
