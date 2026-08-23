@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Meu GoLive</title>
+    <script src="https://unpkg.com/@discord/embedded-app-sdk@1.1.0/dist/main.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body { background: #1e1f22; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        video { width: 90%; max-width: 800px; background: #000; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .controls { margin-top: 20px; }
+        button { background: #5865f2; color: white; border: none; padding: 12px 25px; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 16px; }
+        button:hover { background: #4752c4; }
+        #status { margin-bottom: 10px; color: #b5bac1; }
+    </style>
+</head>
+<body>
+    <div id="status">Conectando ao Discord...</div>
+    <video id="videoDisplay" autoplay playsinline controls></video>
+    <div class="controls">
+        <button id="shareBtn">📺 Transmitir Tela</button>
+    </div>
+
+    <script>
+        const CLIENT_ID = "1541152251576451222"; // <--- COLOQUE SEU ID AQUI
+        const discordSdk = new DiscordSDK.DiscordSDK(CLIENT_ID);
+        let peer;
+
+        async function start() {
+            await discordSdk.ready();
+            document.getElementById('status').innerText = "Pronto no Canal: " + discordSdk.channelId;
+
+            // Criar conexão Peer baseada no ID do canal do Discord
+            peer = new Peer(discordSdk.channelId + "-" + Math.floor(Math.random() * 1000));
+
+            peer.on('call', (call) => {
+                call.answer();
+                call.on('stream', (stream) => {
+                    document.getElementById('videoDisplay').srcObject = stream;
+                });
+            });
+
+            document.getElementById('shareBtn').onclick = async () => {
+                const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+                document.getElementById('videoDisplay').srcObject = stream;
+                
+                // Avisar aos outros (isso precisaria de uma lista de IDs, 
+                // para simplificar, essa versão foca em quem transmite)
+                console.log("Transmitindo...");
+            };
+        }
+
+        start();
+    </script>
+</body>
+</html>
