@@ -1,0 +1,17 @@
+{
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Permissions-Policy",
+          "value": "display-capture=(self), microphone=(self), camera=(self)"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "ALLOW-FROM https://discord.com"
+        }
+      ]
+    }
+  ]
+}
