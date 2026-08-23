@@ -1,34 +1,196 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <title>GoLive Fix</title>
-    <style>
-        body { background: #1e1f22; color: white; font-family: sans-serif; text-align: center; }
-        video { width: 90%; background: #000; border-radius: 8px; margin-top: 20px; }
-        button { background: #5865f2; color: white; border: none; padding: 15px 30px; border-radius: 5px; cursor: pointer; font-size: 18px; margin-top: 20px; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Discord GoLive</title>
+  <!-- SDK do Discord e PeerJS -->
+  <script src="https://unpkg.com/@discord/embedded-app-sdk@1.1.0/dist/main.js"></script>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #1e1f22;
+      color: #dbdee1;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      background: #2b2d31;
+      border-radius: 12px;
+      padding: 24px;
+      width: 100%;
+      max-width: 850px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      text-align: center;
+    }
+    h1 { font-size: 22px; color: #f2f3f5; margin-bottom: 6px; }
+    p.subtitle { font-size: 14px; color: #949ba4; margin-bottom: 20px; }
+    
+    .status-badge {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: bold;
+      background: #383a40;
+      color: #b5bac1;
+      margin-bottom: 20px;
+    }
+    .status-badge.online { background: #23a55a22; color: #23a55a; border: 1px solid #23a55a44; }
+
+    .video-wrapper {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16/9;
+      background: #111214;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #35363c;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .btn-stream {
+      background-color: #5865f2;
+      color: white;
+      border: none;
+      padding: 14px 28px;
+      font-size: 16px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .btn-stream:hover { background-color: #4752c4; }
+    .btn-stream:active { transform: scale(0.98); }
+  </style>
 </head>
 <body>
-    <h2>🎬 Teste de Tela</h2>
-    <button id="btn">CLIQUE PARA TRANSMITIR</button>
-    <br>
-    <video id="v" autoplay playsinline></video>
 
-    <script>
-        document.getElementById('btn').onclick = async () => {
-            try {
-                // O segredo está aqui: o navegador precisa dessa chamada direta
-                const stream = await navigator.mediaDevices.getDisplayMedia({ 
-                    video: true, 
-                    audio: true 
-                });
-                document.getElementById('v').srcObject = stream;
-            } catch (e) {
-                alert("Erro: " + e.message);
-                console.error(e);
+  <div class="container">
+    <h1>🎬 GoLive Stream</h1>
+    <p class="subtitle">Transmita sua tela diretamente no canal de voz</p>
+    
+    <div id="statusBadge" class="status-badge">Conectando...</div>
+
+    <div class="video-wrapper">
+      <video id="mainVideo" autoplay playsinline controls></video>
+    </div>
+
+    <button id="btnStart" class="btn-stream">
+      🚀 ABRIR TRANSMISSOR DE TELA
+    </button>
+  </div>
+
+  <script>
+    const CLIENT_ID = "1541152251576451222"; // Seu Client ID
+    const statusBadge = document.getElementById('statusBadge');
+    const mainVideo = document.getElementById('mainVideo');
+    const btnStart = document.getElementById('btnStart');
+
+    // 1. Inicializa o Discord SDK
+    async function initDiscord() {
+      try {
+        const discordSdk = new DiscordSDK.DiscordSDK(CLIENT_ID);
+        await discordSdk.ready();
+        statusBadge.innerText = "✅ Conectado ao Discord!";
+        statusBadge.className = "status-badge online";
+      } catch (e) {
+        statusBadge.innerText = "🌐 Modo de Teste Web";
+      }
+    }
+
+    // 2. TRUQUE DA JANELA POP-OUT (Contorna os bloqueios de segurança)
+    btnStart.onclick = () => {
+      // Abre uma janela flutuante separada
+      const pop = window.open("", "GoLivePopout", "width=480,height=360,resizable=yes");
+
+      if (!pop) {
+        alert("⚠️ O navegador bloqueou o pop-up! Clique no ícone de cadeado/pop-up na barra de endereço para permitir.");
+        return;
+      }
+
+      // Estiliza e cria o botão dentro da Janela Pop-out
+      pop.document.body.innerHTML = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Seleção de Tela - GoLive</title>
+          <style>
+            body {
+              background: #1e1f22;
+              color: white;
+              font-family: Arial, sans-serif;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              height: 100vh;
+              margin: 0;
+              text-align: center;
+              padding: 15px;
             }
-        };
-    </script>
+            h3 { margin-bottom: 10px; font-size: 18px; }
+            p { color: #b5bac1; font-size: 13px; margin-bottom: 20px; }
+            button {
+              background: #23a55a;
+              color: white;
+              border: none;
+              padding: 14px 24px;
+              font-size: 15px;
+              font-weight: bold;
+              border-radius: 6px;
+              cursor: pointer;
+            }
+            button:hover { background: #1f924e; }
+          </style>
+        </head>
+        <body>
+          <h3>🖥️ Selecionar Tela / Jogo</h3>
+          <p>Clique no botão abaixo para autorizar o compartilhamento.</p>
+          <button id="btnCapturar">ESCOLHER TELA AGORA</button>
+        </body>
+        </html>
+      `;
+
+      // Evento de clique dentro da janela externa
+      pop.document.getElementById('btnCapturar').onclick = async () => {
+        try {
+          // Captura a tela de dentro da janela externa (Permitido pelo navegador!)
+          const stream = await pop.navigator.mediaDevices.getDisplayMedia({
+            video: { frameRate: 60 },
+            audio: true
+          });
+
+          // Envia o vídeo de volta para a tela principal no Discord
+          mainVideo.srcObject = stream;
+          statusBadge.innerText = "🎥 Transmitindo Ao Vivo!";
+          statusBadge.className = "status-badge online";
+
+          // Fecha a janelinha externa automaticamente
+          pop.close();
+
+        } catch (err) {
+          alert("Erro ao selecionar tela: " + err.message);
+          pop.close();
+        }
+      };
+    };
+
+    initDiscord();
+  </script>
 </body>
 </html>
