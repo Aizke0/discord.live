@@ -2,65 +2,33 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>GoLive Bot</title>
-    <script src="https://unpkg.com/@discord/embedded-app-sdk@1.1.0/dist/main.js"></script>
+    <title>GoLive Fix</title>
     <style>
-        body { background: #1e1f22; color: white; font-family: sans-serif; text-align: center; padding: 20px; }
-        video { width: 100%; max-width: 600px; background: #000; border-radius: 8px; margin-top: 20px; }
-        button { background: #5865f2; color: white; border: none; padding: 15px 30px; border-radius: 5px; cursor: pointer; font-size: 18px; font-weight: bold; }
-        button:hover { background: #4752c4; }
-        #status { color: #b5bac1; margin-bottom: 20px; font-size: 14px; }
+        body { background: #1e1f22; color: white; font-family: sans-serif; text-align: center; }
+        video { width: 90%; background: #000; border-radius: 8px; margin-top: 20px; }
+        button { background: #5865f2; color: white; border: none; padding: 15px 30px; border-radius: 5px; cursor: pointer; font-size: 18px; margin-top: 20px; }
     </style>
 </head>
 <body>
-
-    <h2>🎬 Transmissão de Tela</h2>
-    <div id="status">Status: Iniciando...</div>
-
-    <button id="btnShare">📺 COMPARTILHAR TELA</button>
+    <h2>🎬 Teste de Tela</h2>
+    <button id="btn">CLIQUE PARA TRANSMITIR</button>
     <br>
-    <video id="videoPreview" autoplay playsinline></video>
+    <video id="v" autoplay playsinline></video>
 
     <script>
-        // Seu Client ID
-        const CLIENT_ID = "1541152251576451222"; 
-        const statusDiv = document.getElementById('status');
-        
-        // 1. Iniciar SDK do Discord
-        // Usamos try/catch para o site não travar se o SDK falhar
-        try {
-            const discordSdk = new DiscordSDK.DiscordSDK(CLIENT_ID);
-            discordSdk.ready().then(() => {
-                statusDiv.innerText = "✅ Conectado ao Discord!";
-                statusDiv.style.color = "#3ba55c";
-            }).catch(err => {
-                statusDiv.innerText = "⚠️ Rodando fora do Discord (Modo Web)";
-            });
-        } catch (e) {
-            statusDiv.innerText = "⚠️ Erro ao carregar SDK. Testando em modo navegador.";
-        }
-
-        // 2. Lógica de Captura de Tela (Independente do SDK)
-        document.getElementById('btnShare').addEventListener('click', async () => {
+        document.getElementById('btn').onclick = async () => {
             try {
-                statusDiv.innerText = "Tentando capturar tela...";
-                
-                // Pede a tela ao navegador
-                const stream = await navigator.mediaDevices.getDisplayMedia({
-                    video: { cursor: "always" },
-                    audio: true
+                // O segredo está aqui: o navegador precisa dessa chamada direta
+                const stream = await navigator.mediaDevices.getDisplayMedia({ 
+                    video: true, 
+                    audio: true 
                 });
-
-                document.getElementById('videoPreview').srcObject = stream;
-                statusDiv.innerText = "🎥 Transmitindo!";
-                statusDiv.style.color = "#3ba55c";
-
-            } catch (err) {
-                console.error(err);
-                statusDiv.innerText = "❌ Erro: " + err.message;
-                statusDiv.style.color = "#ed4245";
+                document.getElementById('v').srcObject = stream;
+            } catch (e) {
+                alert("Erro: " + e.message);
+                console.error(e);
             }
-        });
+        };
     </script>
 </body>
 </html>
