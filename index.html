@@ -2,72 +2,65 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GoLive Teste</title>
+    <title>GoLive Bot</title>
     <script src="https://unpkg.com/@discord/embedded-app-sdk@1.1.0/dist/main.js"></script>
     <style>
-        body { background: #313338; color: white; font-family: sans-serif; text-align: center; padding: 20px; }
-        video { width: 100%; max-width: 600px; background: black; border-radius: 8px; margin-top: 20px; }
-        button { background: #5865f2; color: white; border: none; padding: 15px 30px; border-radius: 5px; cursor: pointer; font-size: 18px; }
-        #log { color: #ffaa00; font-size: 12px; margin-top: 10px; border: 1px solid #555; padding: 10px; text-align: left; overflow-y: auto; max-height: 100px; }
+        body { background: #1e1f22; color: white; font-family: sans-serif; text-align: center; padding: 20px; }
+        video { width: 100%; max-width: 600px; background: #000; border-radius: 8px; margin-top: 20px; }
+        button { background: #5865f2; color: white; border: none; padding: 15px 30px; border-radius: 5px; cursor: pointer; font-size: 18px; font-weight: bold; }
+        button:hover { background: #4752c4; }
+        #status { color: #b5bac1; margin-bottom: 20px; font-size: 14px; }
     </style>
 </head>
 <body>
 
-    <h2>🎬 Teste de Transmissão</h2>
-    <div id="status">Verificando SDK...</div>
-    <div id="log">Logs: <br></div>
+    <h2>🎬 Transmissão de Tela</h2>
+    <div id="status">Status: Iniciando...</div>
 
-    <button id="btnShare">🚀 TRANSMITIR TELA</button>
+    <button id="btnShare">📺 COMPARTILHAR TELA</button>
     <br>
-    <video id="meuVideo" autoplay playsinline></video>
+    <video id="videoPreview" autoplay playsinline></video>
 
     <script>
-        const CLIENT_ID = "1541152251576451222"; // <-- COLOQUE SEU ID AQUI
-        const logElement = document.getElementById('log');
+        // Seu Client ID
+        const CLIENT_ID = "1541152251576451222"; 
+        const statusDiv = document.getElementById('status');
         
-        function addLog(msg) {
-            logElement.innerHTML += "> " + msg + "<br>";
-            console.log(msg);
+        // 1. Iniciar SDK do Discord
+        // Usamos try/catch para o site não travar se o SDK falhar
+        try {
+            const discordSdk = new DiscordSDK.DiscordSDK(CLIENT_ID);
+            discordSdk.ready().then(() => {
+                statusDiv.innerText = "✅ Conectado ao Discord!";
+                statusDiv.style.color = "#3ba55c";
+            }).catch(err => {
+                statusDiv.innerText = "⚠️ Rodando fora do Discord (Modo Web)";
+            });
+        } catch (e) {
+            statusDiv.innerText = "⚠️ Erro ao carregar SDK. Testando em modo navegador.";
         }
 
-        // 1. Iniciar o SDK do Discord
-        const discordSdk = new DiscordSDK.DiscordSDK(CLIENT_ID);
-
-        async function initDiscord() {
-            try {
-                addLog("Tentando conectar ao Discord...");
-                await discordSdk.ready();
-                addLog("Conectado ao Discord com sucesso!");
-                document.getElementById('status').innerText = "✅ Online no Discord";
-            } catch (e) {
-                addLog("Erro SDK: " + e.message);
-                document.getElementById('status').innerText = "❌ Erro ao carregar SDK";
-            }
-        }
-
-        // 2. Lógica do Botão
+        // 2. Lógica de Captura de Tela (Independente do SDK)
         document.getElementById('btnShare').addEventListener('click', async () => {
-            addLog("Botão clicado. Pedindo permissão de tela...");
-            
             try {
-                // Tenta capturar a tela
+                statusDiv.innerText = "Tentando capturar tela...";
+                
+                // Pede a tela ao navegador
                 const stream = await navigator.mediaDevices.getDisplayMedia({
-                    video: true,
+                    video: { cursor: "always" },
                     audio: true
                 });
 
-                addLog("Permissão concedida! Mostrando vídeo...");
-                const video = document.getElementById('meuVideo');
-                video.srcObject = stream;
+                document.getElementById('videoPreview').srcObject = stream;
+                statusDiv.innerText = "🎥 Transmitindo!";
+                statusDiv.style.color = "#3ba55c";
 
             } catch (err) {
-                addLog("ERRO AO TRANSMITIR: " + err.name + " - " + err.message);
-                alert("Erro: " + err.message);
+                console.error(err);
+                statusDiv.innerText = "❌ Erro: " + err.message;
+                statusDiv.style.color = "#ed4245";
             }
         });
-
-        initDiscord();
     </script>
 </body>
 </html>
