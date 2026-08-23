@@ -5,7 +5,7 @@
       "headers": [
         {
           "key": "Permissions-Policy",
-          "value": "display-capture=*, microphone=*, camera=*"
+          "value": "display-capture=(self), microphone=(self), camera=(self)"
         },
         {
           "key": "Content-Security-Policy",
