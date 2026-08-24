@@ -2,90 +2,97 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Viewer GoLive</title>
+    <title>GoLive Pro</title>
+    <script src="https://unpkg.com/@discord/embedded-app-sdk@1.1.0/dist/main.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { background: #1e1f22; color: #dbdee1; font-family: sans-serif; text-align: center; padding: 20px; margin: 0; }
-        .btn { background: #23a55a; color: white; padding: 15px 25px; border-radius: 5px; cursor: pointer; border: none; font-weight: bold; font-size: 16px; transition: 0.2s; }
-        .btn:hover { background: #1f924e; }
-        video { width: 100%; max-width: 720px; background: #000; border-radius: 8px; margin-top: 15px; border: 1px solid #333; aspect-ratio: 16/9; }
-        #log-container { background: #000; color: #0f0; font-family: monospace; font-size: 11px; padding: 10px; text-align: left; height: 120px; overflow-y: auto; margin: 15px auto; max-width: 720px; border: 1px solid #444; }
+        .btn { background: #23a55a; color: white; padding: 15px 25px; border-radius: 5px; cursor: pointer; border: none; font-weight: bold; font-size: 16px; width: 100%; max-width: 400px; }
+        .video-box { width: 100%; max-width: 720px; background: #000; border-radius: 8px; margin: 15px auto; aspect-ratio: 16/9; border: 1px solid #333; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        video { width: 100%; height: 100%; object-fit: contain; }
+        #log { background: #000; color: #0f0; font-family: monospace; font-size: 11px; padding: 10px; text-align: left; height: 100px; overflow-y: auto; margin: 10px auto; max-width: 720px; border: 1px solid #444; }
     </style>
 </head>
 <body>
     <h3>🎬 GoLive Player</h3>
-    
-    <button id="btnOpen" class="btn">🌐 ABRIR TRANSMISSOR NO NAVEGADOR</button>
-    
-    <div id="log-container">Iniciando scripts...<br></div>
-    
-    <video id="remoteVideo" autoplay playsinline controls></video>
-
-    <!-- Carregamento manual dos scripts para evitar travamentos -->
-    <script src="https://unpkg.com/@discord/embedded-app-sdk@1.1.0/dist/main.js"></script>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <button id="btnOpen" class="btn">🌐 TRANSMITIR MINHA TELA</button>
+    <div id="log">> Aguardando inicialização...<br></div>
+    <div class="video-box">
+        <video id="remoteVideo" autoplay playsinline controls></video>
+    </div>
 
     <script>
         const CLIENT_ID = "1541152251576451222";
-        const logBox = document.getElementById('log-container');
-        const log = (m) => { logBox.innerHTML += `> ${m}<br>`; logBox.scrollTop = logBox.scrollHeight; };
+        const log = (m) => { const l = document.getElementById('log'); l.innerHTML += `> ${m}<br>`; l.scrollTop = l.scrollHeight; };
         
-        let roomId = "sala-" + Math.floor(Math.random() * 9999); // ID temporário
-        let peer;
+        let roomId = "sala-" + Math.floor(Math.random() * 9999);
+        let discordSdk;
 
-        async function startApp() {
-            log("Verificando Discord SDK...");
+        async function init() {
+            log("Iniciando SDK...");
             
-            let discordSdk;
             try {
+                // Tenta instanciar o SDK
                 discordSdk = new window.DiscordSDK.DiscordSDK(CLIENT_ID);
-                // Tenta conectar ao Discord com tempo limite de 2 segundos
+                
+                // Espera o Discord responder (máximo 5 segundos)
+                log("Tentando Handshake com Discord...");
                 await Promise.race([
                     discordSdk.ready(),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 2000))
+                    new Promise((_, reject) => setTimeout(() => reject(new Error("Discord não respondeu a tempo")), 5000))
                 ]);
+
                 roomId = "room-" + discordSdk.channelId;
-                log("✅ Discord Detectado! Sala: " + discordSdk.channelId);
-            } catch (e) {
-                log("⚠️ Discord não detectado ou demorou muito. Usando Modo Web.");
+                log("✅ DISCORD RECONHECIDO!");
+                log("Canal: " + discordSdk.channelId);
+
+            } catch (err) {
+                log("❌ ERRO SDK: " + err.message);
+                log("⚠️ Entrando em Modo Web (Teste fora do Discord)");
             }
 
-            // Configura o botão
+            setupUI();
+            startConnection();
+        }
+
+        function setupUI() {
             document.getElementById('btnOpen').onclick = () => {
                 const url = `${window.location.origin}/share.html?room=${roomId}`;
                 log("Abrindo transmissor...");
-                if (window.DiscordSDK && discordSdk.ready) {
+                
+                // Se estiver no Discord, usa o comando oficial. Se não, abre nova aba.
+                if (window.discordSdk && discordSdk.instanceId) {
                     discordSdk.commands.openExternalLink({ url });
                 } else {
                     window.open(url, "_blank");
                 }
             };
+        }
 
-            // Inicia o PeerJS para receber o vídeo
-            log("Conectando ao servidor de vídeo...");
-            peer = new Peer();
+        function startConnection() {
+            log("Iniciando PeerJS...");
+            const peer = new Peer();
 
             peer.on('open', (id) => {
-                log("Seu ID: " + id);
+                log("Seu ID de Espectador: " + id);
                 log("Procurando transmissão na sala: " + roomId);
                 
-                // Loop para tentar conectar no transmissor
                 setInterval(() => {
                     const call = peer.call(roomId, null); 
                     if (call) {
                         call.on('stream', (stream) => {
-                            log("🎬 SINAL DE VÍDEO RECEBIDO!");
-                            const video = document.getElementById('remoteVideo');
-                            if (video.srcObject !== stream) video.srcObject = stream;
+                            log("🎬 VÍDEO RECEBIDO!");
+                            const v = document.getElementById('remoteVideo');
+                            if (v.srcObject !== stream) v.srcObject = stream;
                         });
                     }
                 }, 5000);
             });
 
-            peer.on('error', (err) => log("Erro de Conexão: " + err.type));
+            peer.on('error', (e) => log("Erro de Conexão: " + e.type));
         }
 
-        // Aguarda os scripts carregarem antes de iniciar
-        window.onload = startApp;
+        window.onload = init;
     </script>
 </body>
 </html>
