@@ -1,76 +1,99 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <title>GoLive Bot</title>
-    <script src="https://unpkg.com/@discord/embedded-app-sdk@1.1.0/dist/main.js"></script>
-    <style>
-        body { background: #313338; color: white; font-family: sans-serif; text-align: center; margin: 0; padding: 20px; }
-        .card { background: #2b2d31; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
-        button { background: #5865f2; color: white; border: none; padding: 15px 30px; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 16px; margin: 10px; }
-        button:hover { background: #4752c4; }
-        video { width: 100%; max-width: 600px; background: #000; border-radius: 8px; margin-top: 20px; border: 2px solid #4e5058; }
-        #status { font-size: 14px; color: #b5bac1; margin-bottom: 10px; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GoLive Discord</title>
+  <script src="https://unpkg.com/@discord/embedded-app-sdk@1.1.0/dist/main.js"></script>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #1e1f22; color: #dbdee1; font-family: sans-serif; text-align: center; padding: 20px; }
+    .card { background: #2b2d31; padding: 24px; border-radius: 12px; max-width: 800px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+    h2 { margin-bottom: 8px; color: #fff; }
+    p { font-size: 14px; color: #949ba4; margin-bottom: 20px; }
+    
+    .btn-external {
+      display: inline-block;
+      background: #23a55a;
+      color: white;
+      text-decoration: none;
+      padding: 14px 28px;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 16px;
+      margin-bottom: 20px;
+      transition: background 0.2s;
+    }
+    .btn-external:hover { background: #1f924e; }
+    
+    .video-container {
+      width: 100%;
+      aspect-ratio: 16/9;
+      background: #111214;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #383a40;
+    }
+    video { width: 100%; height: 100%; object-fit: contain; }
+  </style>
 </head>
 <body>
 
-    <div class="card">
-        <h2>🎬 Transmissão de Tela</h2>
-        <div id="status">Aguardando autorização do Discord...</div>
-        
-        <!-- Botão que vai pedir a tela -->
-        <button id="btnShare">📺 TRANSMITIR TELA</button>
-        
-        <br>
-        <video id="videoPreview" autoplay playsinline controls></video>
+  <div class="card">
+    <h2>🎬 GoLive Stream</h2>
+    <p id="status">Conectando ao Discord...</p>
+
+    <!-- Este link abre em uma nova aba REAL do navegador -->
+    <a id="btnTransmitir" href="#" target="_blank" class="btn-external">
+      🌐 CLIQUE AQUI PARA TRANSMITIR SUA TELA
+    </a>
+
+    <div class="video-container">
+      <video id="remoteVideo" autoplay playsinline controls></video>
     </div>
+  </div>
 
-    <script>
-        const CLIENT_ID = "1541152251576451222";
-        const discordSdk = new DiscordSDK.DiscordSDK(CLIENT_ID);
-        const btn = document.getElementById('btnShare');
-        const status = document.getElementById('status');
+  <script>
+    const CLIENT_ID = "1541152251576451222";
+    const discordSdk = new DiscordSDK.DiscordSDK(CLIENT_ID);
+    let channelId = "sala-geral";
 
-        async function setup() {
-            try {
-                // 1. Inicia o SDK
-                await discordSdk.ready();
-                
-                // 2. PEDE AUTORIZAÇÃO (Aparece aquela janelinha oficial do Discord)
-                const auth = await discordSdk.commands.authorize({
-                    client_id: CLIENT_ID,
-                    response_type: "code",
-                    state: "",
-                    prompt: "none",
-                    scope: ["identify", "guilds", "rpc.activities.write.protocol"],
-                });
+    async function init() {
+      try {
+        await discordSdk.ready();
+        channelId = discordSdk.channelId || "sala-geral";
+        document.getElementById('status').innerText = "✅ Conectado! Sala: " + channelId;
+      } catch (e) {
+        document.getElementById('status').innerText = "🌐 Modo Web Ativo";
+      }
 
-                status.innerText = "✅ Bot Autorizado! Clique no botão abaixo.";
-                status.style.color = "#23a55a";
-            } catch (e) {
-                status.innerText = "⚠️ Rodando em modo navegador (Sem SDK).";
-            }
+      // Cria o link para a página de transmissão externa
+      const shareUrl = `${window.location.origin}/share.html?room=${channelId}`;
+      document.getElementById('btnTransmitir').href = shareUrl;
+
+      // Inicia o recebedor de vídeo
+      const peer = new Peer("viewer-" + Math.floor(Math.random() * 1000));
+      
+      peer.on('open', () => {
+        // Tenta conectar no transmissor da sala
+        const call = peer.call(channelId, null);
+        if(call) {
+          call.on('stream', (stream) => {
+            document.getElementById('remoteVideo').srcObject = stream;
+          });
         }
+      });
 
-        // AÇÃO DO BOTÃO
-        btn.onclick = async () => {
-            try {
-                // Tenta capturar a tela diretamente na mesma janela
-                const stream = await navigator.mediaDevices.getDisplayMedia({
-                    video: { cursor: "always" },
-                    audio: true
-                });
+      peer.on('call', (call) => {
+        call.answer();
+        call.on('stream', (stream) => {
+          document.getElementById('remoteVideo').srcObject = stream;
+        });
+      });
+    }
 
-                document.getElementById('videoPreview').srcObject = stream;
-                status.innerText = "🎥 Transmitindo agora!";
-            } catch (err) {
-                console.error(err);
-                alert("Erro ao capturar tela: " + err.message + "\n\nCertifique-se de estar usando o Discord pelo NAVEGADOR Chrome.");
-            }
-        };
-
-        setup();
-    </script>
+    init();
+  </script>
 </body>
 </html>
