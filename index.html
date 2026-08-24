@@ -7,56 +7,79 @@
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { background: #1e1f22; color: white; font-family: sans-serif; text-align: center; padding: 20px; }
-        .btn { background: #23a55a; color: white; padding: 15px; border-radius: 8px; cursor: pointer; border: none; font-weight: bold; }
-        video { width: 100%; max-width: 720px; background: #000; border-radius: 8px; margin-top: 10px; }
-        #log { background: #000; color: #0f0; font-family: monospace; font-size: 11px; padding: 10px; text-align: left; height: 80px; overflow-y: auto; margin-top: 10px; border: 1px solid #333; }
+        .btn { background: #23a55a; color: white; padding: 15px; border-radius: 8px; cursor: pointer; border: none; font-weight: bold; font-size: 16px; }
+        video { width: 100%; max-width: 720px; background: #000; border-radius: 8px; margin-top: 15px; border: 2px solid #333; }
+        #log { background: #000; color: #0f0; font-family: monospace; font-size: 11px; padding: 10px; text-align: left; height: 100px; overflow-y: auto; margin-top: 10px; border: 1px solid #333; }
     </style>
 </head>
 <body>
     <h3>🎬 GoLive Assistir</h3>
     <button id="btnOpen" class="btn">🌐 ABRIR TRANSMISSOR NO CHROME</button>
-    <div id="log">Aguardando SDK...</div>
+    <div id="log">Iniciando sistema...<br></div>
     <video id="remoteVideo" autoplay playsinline controls></video>
 
     <script>
         const CLIENT_ID = "1541152251576451222";
-        const discordSdk = new DiscordSDK.DiscordSDK(CLIENT_ID);
         const log = (m) => document.getElementById('log').innerHTML += "> " + m + "<br>";
+        let roomId = "sala-padrao-" + Math.floor(Math.random() * 1000); // Sala padrão caso o SDK falhe
 
         async function init() {
+            log("Verificando ambiente...");
+
+            // Tenta carregar o SDK do Discord, mas não trava se falhar
+            const discordSdk = new DiscordSDK.DiscordSDK(CLIENT_ID);
+            
+            const sdkTimeout = setTimeout(() => {
+                log("⚠️ SDK demorou muito. Entrando em Modo Web.");
+                startPeer();
+            }, 3000);
+
             try {
                 await discordSdk.ready();
-                log("Discord SDK Pronto.");
-                const roomId = "room-" + discordSdk.channelId;
-
+                clearTimeout(sdkTimeout);
+                roomId = "room-" + discordSdk.channelId;
+                log("✅ Conectado ao Discord. Sala: " + discordSdk.channelId);
+                
                 document.getElementById('btnOpen').onclick = () => {
                     const url = `${window.location.origin}/share.html?room=${roomId}`;
                     discordSdk.commands.openExternalLink({ url });
                 };
-
-                // Inicia PeerJS
-                const peer = new Peer();
-                peer.on('open', (id) => {
-                    log("Meu ID: " + id);
-                    log("Tentando conectar na sala: " + roomId);
-                    
-                    // Tenta chamar o transmissor a cada 3 segundos
-                    setInterval(() => {
-                        log("Procurando transmissão...");
-                        const call = peer.call(roomId, null); 
-                        if (call) {
-                            call.on('stream', (stream) => {
-                                log("VÍDEO RECEBIDO!");
-                                document.getElementById('remoteVideo').srcObject = stream;
-                            });
-                        }
-                    }, 5000);
-                });
-
-                peer.on('error', (err) => log("Erro Peer: " + err.type));
-
-            } catch (e) { log("Erro Init: " + e.message); }
+                startPeer();
+            } catch (e) {
+                log("Rodando fora do Discord.");
+            }
         }
+
+        function startPeer() {
+            log("Iniciando PeerJS...");
+            const peer = new Peer();
+            
+            peer.on('open', (id) => {
+                log("Meu ID de Viewer: " + id);
+                log("Procurando transmissão na sala: " + roomId);
+                
+                // Tenta conectar no transmissor
+                setInterval(() => {
+                    const call = peer.call(roomId, null); 
+                    if (call) {
+                        call.on('stream', (stream) => {
+                            log("🎬 VÍDEO RECEBIDO!");
+                            document.getElementById('remoteVideo').srcObject = stream;
+                        });
+                    }
+                }, 4000);
+            });
+
+            peer.on('error', (err) => log("Erro Peer: " + err.type));
+
+            // Se estiver fora do Discord, o botão abre o link normal
+            if (!document.getElementById('btnOpen').onclick) {
+                document.getElementById('btnOpen').onclick = () => {
+                    window.open(`${window.location.origin}/share.html?room=${roomId}`, "_blank");
+                };
+            }
+        }
+
         init();
     </script>
 </body>
