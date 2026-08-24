@@ -3,75 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <title>GoLive Pro</title>
-    <!-- Carregando scripts no topo para garantir que existam -->
-    <script src="https://unpkg.com/@discord/embedded-app-sdk@1.1.0/dist/main.js"></script>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- Importando os scripts com DEFER para garantir a ordem -->
+    <script src="https://unpkg.com/@discord/embedded-app-sdk@1.1.0/dist/main.js" defer></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js" defer></script>
     <style>
         body { background: #1e1f22; color: #dbdee1; font-family: sans-serif; text-align: center; padding: 20px; margin: 0; }
         .btn { background: #23a55a; color: white; padding: 15px 25px; border-radius: 5px; cursor: pointer; border: none; font-weight: bold; font-size: 16px; width: 100%; max-width: 400px; }
-        .video-box { width: 100%; max-width: 720px; background: #000; border-radius: 8px; margin: 15px auto; aspect-ratio: 16/9; border: 1px solid #333; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .video-box { width: 100%; max-width: 720px; background: #000; border-radius: 8px; margin: 15px auto; aspect-ratio: 16/9; border: 1px solid #333; display: flex; align-items: center; justify-content: center; }
         video { width: 100%; height: 100%; object-fit: contain; }
-        #log { background: #000; color: #0f0; font-family: monospace; font-size: 11px; padding: 10px; text-align: left; height: 120px; overflow-y: auto; margin: 10px auto; max-width: 720px; border: 1px solid #444; }
+        #log { background: #000; color: #0f0; font-family: monospace; font-size: 11px; padding: 10px; text-align: left; height: 130px; overflow-y: auto; margin: 10px auto; max-width: 720px; border: 1px solid #444; }
     </style>
 </head>
 <body>
     <h3>🎬 GoLive Player</h3>
     <button id="btnOpen" class="btn">🌐 TRANSMITIR MINHA TELA</button>
-    <div id="log">> Aguardando inicialização...<br></div>
+    
+    <div id="log">> Carregando sistema...<br></div>
+    
     <div class="video-box">
         <video id="remoteVideo" autoplay playsinline controls></video>
     </div>
 
     <script>
         const CLIENT_ID = "1541152251576451222";
-        const log = (m) => { const l = document.getElementById('log'); l.innerHTML += `> ${m}<br>`; l.scrollTop = l.scrollHeight; };
+        const log = (m) => { 
+            const l = document.getElementById('log'); 
+            l.innerHTML += `> ${m}<br>`; 
+            l.scrollTop = l.scrollHeight;
+            console.log(m);
+        };
         
         let roomId = "sala-" + Math.floor(Math.random() * 9999);
         let discordSdk;
 
-        async function init() {
-            log("Iniciando...");
+        // Função que espera as bibliotecas carregarem no navegador
+        function startApp() {
+            log("Scripts carregados. Iniciando busca pelo Discord...");
 
-            // Tenta encontrar o SDK do Discord de 3 formas diferentes (previne o erro que deu)
+            // Tenta achar o SDK
             const SDK_LIB = window.discordSdk || window.DiscordSDK;
 
             if (!SDK_LIB) {
-                log("❌ Erro: Biblioteca do Discord não carregou.");
-                log("⚠️ Entrando em Modo Web direto.");
-                startConnection();
-                setupUI();
+                log("❌ Erro: Bibliotecas não encontradas no carregamento.");
                 return;
             }
 
-            try {
-                // A forma correta de instanciar no navegador é essa:
-                discordSdk = new SDK_LIB.DiscordSDK(CLIENT_ID);
-                
-                log("Tentando Handshake com Discord...");
-                await Promise.race([
-                    discordSdk.ready(),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 4000))
-                ]);
+            discordSdk = new SDK_LIB.DiscordSDK(CLIENT_ID);
 
-                roomId = "room-" + discordSdk.channelId;
-                log("✅ DISCORD RECONHECIDO!");
-                log("Canal: " + discordSdk.channelId);
+            async function connect() {
+                try {
+                    log("Estabelecendo conexão com Discord (Handshake)...");
+                    
+                    // Aumentamos o tempo para 10 segundos
+                    await Promise.race([
+                        discordSdk.ready(),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error("Discord não respondeu em 10s")), 10000))
+                    ]);
 
-            } catch (err) {
-                log("❌ SDK não respondeu: " + err.message);
-                log("⚠️ Modo Web Ativado.");
+                    roomId = "room-" + discordSdk.channelId;
+                    log("✅ DISCORD RECONHECIDO COM SUCESSO!");
+                    log("ID da Sala: " + roomId);
+
+                } catch (e) {
+                    log("⚠️ Modo Web: Discord não detectado.");
+                    log("Causa: " + e.message);
+                }
+
+                setupUI();
+                startPeer();
             }
 
-            setupUI();
-            startConnection();
+            connect();
         }
 
         function setupUI() {
             document.getElementById('btnOpen').onclick = () => {
                 const url = `${window.location.origin}/share.html?room=${roomId}`;
-                log("Abrindo transmissor...");
+                log("Abrindo transmissor em aba externa...");
                 
-                // Abre link no Discord ou no Navegador
                 if (discordSdk && discordSdk.instanceId) {
                     discordSdk.commands.openExternalLink({ url });
                 } else {
@@ -80,19 +89,19 @@
             };
         }
 
-        function startConnection() {
+        function startPeer() {
             log("Iniciando PeerJS...");
             const peer = new Peer();
 
             peer.on('open', (id) => {
-                log("Seu ID: " + id);
-                log("Procurando sala: " + roomId);
+                log("Seu ID de Receptor: " + id);
+                log("Ouvindo sala: " + roomId);
                 
                 setInterval(() => {
                     const call = peer.call(roomId, null); 
                     if (call) {
                         call.on('stream', (stream) => {
-                            log("🎬 VÍDEO RECEBIDO!");
+                            log("🎬 SINAL DE VÍDEO CONECTADO!");
                             const v = document.getElementById('remoteVideo');
                             if (v.srcObject !== stream) v.srcObject = stream;
                         });
@@ -103,8 +112,8 @@
             peer.on('error', (e) => log("Erro Peer: " + e.type));
         }
 
-        // Aguarda tudo carregar para rodar
-        window.addEventListener('load', init);
+        // Garante que o código só roda quando os scripts da HEAD terminarem
+        window.addEventListener('load', startApp);
     </script>
 </body>
 </html>
